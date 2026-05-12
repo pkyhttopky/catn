@@ -1,0 +1,12 @@
+{
+  "name": "live-stream-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for Live Stream",
+  "main": "user.html",
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "dependencies": {
+    "serve": "^14.0.0"
+  }
+}
