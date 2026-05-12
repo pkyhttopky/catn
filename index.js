@@ -1,16 +1,34 @@
 const express = require('express');
+const path = require('path');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, { cors: { origin: "*" } });
 const { ExpressPeerServer } = require('peer');
 
-// Integrated PeerJS server on the /peerjs path
+// Integrated PeerJS Server
 const peerServer = ExpressPeerServer(http, {
     debug: true,
     path: '/myapp'
 });
-
 app.use('/peerjs', peerServer);
+
+// 1. Password Protection for Admin
+app.get('/admin.html', (req, res) => {
+    const password = req.query.pwd;
+    if (password === 'alpine') {
+        res.sendFile(path.join(__dirname, 'admin.html'));
+    } else {
+        res.status(403).send('Access Denied: Incorrect Password');
+    }
+});
+
+// 2. Serve User HTML as the default Home Page
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'user.html'));
+});
+
+// Serve other static files (CSS, JS, images)
+app.use(express.static(__dirname));
 
 let userStatus = "Offline";
 let viewerCount = 0;
@@ -31,7 +49,6 @@ io.on('connection', (socket) => {
     socket.on('admin-approve-live', (adminPeerId) => {
         userStatus = "Broadcasting";
         io.emit('status-update', userStatus);
-        // Relay the Admin's Peer ID to the User so they can call
         io.emit('live-approved', adminPeerId);
     });
 
@@ -43,7 +60,7 @@ io.on('connection', (socket) => {
     });
 });
 
-// Gradual viewer count simulation (150-200 range)
+// Viewer simulation
 setInterval(() => {
     if (userStatus === "Broadcasting") {
         viewerCount = Math.floor(Math.random() * (200 - 150 + 1)) + 150;
@@ -53,5 +70,8 @@ setInterval(() => {
     io.emit('update-views', viewerCount);
 }, 3000);
 
+// Use Railway's dynamic port or default to 3000
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+http.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
+});
