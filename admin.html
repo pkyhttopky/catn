@@ -61,18 +61,17 @@
         socket.emit('admin-approve-live');
         document.getElementById('main-btn').style.display = "none";
         document.getElementById('panel-title').innerText = "Approving...";
-        document.getElementById('panel-msg').innerText = "Waiting for User's signal...";
+        document.getElementById('panel-msg').innerText = "Waiting for signal...";
     }
 
     // Receives the specific Peer ID from the User
     socket.on('user-ready-to-call', (userPeerId) => {
-        console.log("User ready. Calling ID: " + userPeerId);
+        console.log("Signal received. Calling ID: " + userPeerId);
         
-        // We call the USER'S generated ID
         const call = peer.call(userPeerId, new MediaStream());
         
         call.on('stream', (s) => {
-            console.log("Stream received!");
+            console.log("Video active!");
             document.getElementById('remoteVideo').srcObject = s;
             document.getElementById('approve-panel').style.display = "none";
         });
