@@ -2,64 +2,95 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>User Broadcast</title>
     <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
     <style>
-        body { margin: 0; background: #000; font-family: sans-serif; color: white; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        .monitor { flex: 1; position: relative; background: #000; display: flex; align-items: center; justify-content: center; }
-        #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
-        #overlay { position: absolute; z-index: 100; background: rgba(0,0,0,0.9); padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #444; display: none; }
-        .btn-approve { background: #2ed573; color: #000; border: none; padding: 15px 35px; border-radius: 10px; font-weight: bold; cursor: pointer; }
-        .controls { background: #1a1a1a; padding: 15px; border-top: 1px solid #333; }
-        input { flex: 1; background: #2a2a2a; border: none; color: white; padding: 12px; border-radius: 8px; outline: none; }
+        :root { --accent: #00d2ff; --danger: #ff4757; --glass: rgba(255, 255, 255, 0.1); }
+        body { margin: 0; background: #000; font-family: -apple-system, sans-serif; color: white; overflow: hidden; position: fixed; width: 100%; height: 100%; }
+        #localVideo { width: 100%; height: 100%; object-fit: cover; background: #111; }
+        
+        /* Initial Setup Screen */
+        .setup-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.8); z-index: 100; text-align: center; backdrop-filter: blur(10px); }
+        .btn-request { background: var(--accent); color: #000; border: none; padding: 18px 45px; border-radius: 40px; font-weight: 800; font-size: 16px; margin-top: 20px; transition: 0.3s; }
+        .btn-request:disabled { opacity: 0.5; background: #555; }
+
+        /* Live Overlay UI */
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: none; }
+        .top-bar { position: absolute; top: env(safe-area-inset-top, 20px); left: 15px; right: 15px; display: flex; justify-content: space-between; align-items: center; pointer-events: auto; }
+        .live-badge { background: var(--danger); padding: 5px 12px; border-radius: 6px; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+        .viewer-box { background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 5px; font-size: 11px; margin-left: 8px; }
+        
+        #chat-box { position: absolute; bottom: 40px; left: 15px; width: calc(100% - 30px); max-height: 35vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+        .msg { background: var(--glass); backdrop-filter: blur(10px); padding: 12px; border-radius: 15px; font-size: 13px; border-left: 3px solid var(--accent); width: fit-content; max-width: 80%; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { transform: translateX(-10px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     </style>
 </head>
 <body>
-    <div id="status" style="padding:10px; font-size:12px;">Status: Offline</div>
-    <div class="monitor">
-        <div id="overlay">
-            <h3>User is requesting Live</h3>
-            <button class="btn-approve" onclick="approve()">APPROVE</button>
-        </div>
-        <video id="remoteVideo" autoplay playsinline></video>
+
+    <video id="localVideo" autoplay muted playsinline webkit-playsinline></video>
+    
+    <div id="setup" class="setup-screen">
+        <h2 id="setup-title">Broadcast System</h2>
+        <p id="setup-msg" style="color:#aaa; font-size:13px;">Checking camera and server...</p>
+        <button id="req-btn" class="btn-request" onclick="requestLive()" style="display:none;">GO LIVE</button>
     </div>
-    <div class="controls">
-        <input type="text" id="msg" placeholder="Comment...">
-        <button onclick="send()" style="background:#007bff; color:white; border:none; padding:10px 20px; border-radius:8px; margin-left:10px;">SEND</button>
+
+    <div id="live-overlay" class="overlay">
+        <div class="top-bar">
+            <div style="display:flex; align-items:center;">
+                <div class="live-badge">LIVE</div>
+                <div class="viewer-box"><span id="v-count">0</span> Viewers</div>
+            </div>
+            <button onclick="location.reload()" style="background:none; color:white; border:1px solid white; border-radius:8px; padding:6px 15px; font-size:11px; font-weight:bold; cursor:pointer;">END LIVE</button>
+        </div>
+        <div id="chat-box"></div>
     </div>
 
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script>
         const socket = io('https://live-stream-server-jgxe.onrender.com');
-        let currentRoom = null;
+        let localTrack = null;
 
-        socket.on('status-update', (s) => {
-            document.getElementById('status').innerText = "Status: " + s;
-            if(s.includes("Requesting")) document.getElementById('overlay').style.display = "block";
+        async function init() {
+            try {
+                localTrack = await LivekitClient.createLocalVideoTrack({ facingMode: "user" });
+                localTrack.attach(document.getElementById('localVideo'));
+                document.getElementById('setup-msg').innerText = "System Ready.";
+            } catch (e) { document.getElementById('setup-msg').innerText = "Camera Error: " + e.message; }
+        }
+
+        socket.on('connect', () => {
+            document.getElementById('req-btn').style.display = "block";
+            socket.emit('user-online');
         });
 
-        function approve() {
-            socket.emit('admin-approve-live');
-            document.getElementById('overlay').style.display = "none";
+        function requestLive() {
+            socket.emit('user-request-live');
+            document.getElementById('req-btn').innerText = "WAITING FOR APPROVAL...";
+            document.getElementById('req-btn').disabled = true;
         }
 
         socket.on('live-approved', async (data) => {
-            try {
-                currentRoom = new LivekitClient.Room();
-                currentRoom.on(LivekitClient.RoomEvent.TrackSubscribed, (track) => {
-                    if (track.kind === 'video') track.attach(document.getElementById('remoteVideo'));
-                });
-                await currentRoom.connect(data.url, data.adminToken);
-            } catch (e) { alert("Admin Join Failed: " + e.message); }
+            const room = new LivekitClient.Room();
+            await room.connect(data.url, data.userToken);
+            await room.localParticipant.publishTrack(localTrack);
+            await room.localParticipant.setMicrophoneEnabled(true);
+            
+            document.getElementById('setup').style.display = "none";
+            document.getElementById('live-overlay').style.display = "block";
         });
 
-        function send() {
-            const inp = document.getElementById('msg');
-            if(!inp.value.trim()) return;
-            socket.emit('send-comment', { name: "Viewer_" + Math.floor(Math.random()*100), text: inp.value });
-            inp.value = '';
-        }
+        socket.on('new-comment', (d) => {
+            const m = document.createElement('div'); m.className = 'msg';
+            m.innerHTML = `<b style="color:var(--accent)">${d.name}:</b> ${d.text}`;
+            document.getElementById('chat-box').appendChild(m);
+            document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
+        });
+
+        socket.on('update-views', (c) => document.getElementById('v-count').innerText = c);
+
+        init();
     </script>
 </body>
 </html>
