@@ -20,16 +20,16 @@
     </style>
 </head>
 <body>
-
     <header class="status-header">
         <div><span id="dot" class="status-dot" style="background:#888"></span>Status: <b id="status-txt">Offline</b></div>
-        <div style="font-size: 11px; color: #888;">Live Monitor</div>
+        <div id="peer-id-display" style="font-size: 10px; color: #555;">ID: Loading...</div>
     </header>
 
     <div class="monitor-area">
         <div id="approve-panel">
-            <h3 style="margin-top:0">Live Request Received</h3>
-            <button class="btn-approve" onclick="approve()">APPROVE & CONNECT</button>
+            <h3 id="panel-title" style="margin-top:0">Live Request Received</h3>
+            <p id="panel-msg">User is waiting for your approval.</p>
+            <button id="main-action-btn" class="btn-approve" onclick="approve()">APPROVE</button>
         </div>
         <video id="remoteVideo" autoplay playsinline></video>
     </div>
@@ -53,15 +53,18 @@
     let lastUser = "";
     const names = ["James_W", "Saman_94", "Emma_V", "Arjun_K", "Chloe_S", "Ryan_88", "Mila_B", "Chris_D"];
 
+    peer.on('open', id => { document.getElementById('peer-id-display').innerText = "Admin ID: " + id; });
+
     socket.on('status-update', (status) => {
         document.getElementById('status-txt').innerText = status;
         const dot = document.getElementById('dot');
         const panel = document.getElementById('approve-panel');
-        
         if(status.includes("Online")) dot.style.background = "#2ed573";
         else if(status.includes("Requesting")) {
             dot.style.background = "#ffa502";
             panel.style.display = "block";
+            document.getElementById('panel-title').innerText = "Live Request Received";
+            document.getElementById('main-action-btn').style.display = "inline-block";
         }
         else if(status.includes("Broadcasting")) dot.style.background = "#00d2ff";
         else dot.style.background = "#888";
@@ -69,22 +72,21 @@
 
     function approve() {
         socket.emit('admin-approve-live');
-        
-        // Give the user 1.5 seconds to turn on their camera, then call them
-        setTimeout(() => {
-            console.log("Initiating call to User...");
-            // Use an empty stream to trigger the receive-only call
-            const call = peer.call('user-live-stream-123', new MediaStream());
-            
-            call.on('stream', (remoteStream) => {
-                console.log("Video received!");
-                document.getElementById('remoteVideo').srcObject = remoteStream;
-                document.getElementById('approve-panel').style.display = "none";
-            });
-
-            call.on('error', (err) => alert("Video connection failed."));
-        }, 1500);
+        document.getElementById('main-action-btn').style.display = "none";
+        document.getElementById('panel-title').innerText = "Approving...";
+        document.getElementById('panel-msg').innerText = "Waiting for User's camera to start...";
     }
+
+    // This triggers ONLY when the user's camera is actually ON
+    socket.on('user-ready-to-call', () => {
+        console.log("User camera is ready. Calling now...");
+        const call = peer.call('user-live-stream-123', new MediaStream());
+        
+        call.on('stream', (s) => {
+            document.getElementById('remoteVideo').srcObject = s;
+            document.getElementById('approve-panel').style.display = "none";
+        });
+    });
 
     function send(isNew) {
         const inp = document.getElementById('msg');
