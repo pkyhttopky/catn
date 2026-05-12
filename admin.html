@@ -3,93 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Admin Command Center</title>
-    <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+    <title>Admin Dashboard</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
         :root { --bg: #0a0a0a; --accent: #007bff; --success: #2ed573; --warning: #ffa502; }
         body { margin: 0; background: var(--bg); font-family: -apple-system, sans-serif; color: white; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        
         .status-header { background: #1a1a1a; padding: 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
         .status-dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
-
-        .monitor-area { flex: 1; position: relative; background: #000; display: flex; align-items: center; justify-content: center; }
+        .monitor { flex: 1; position: relative; background: #000; display: flex; align-items: center; justify-content: center; }
         #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
-        
-        #approve-panel { position: absolute; z-index: 100; background: rgba(0,0,0,0.95); padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #444; display: none; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
-        .btn-approve { background: var(--success); color: #000; border: none; padding: 15px 40px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 14px; }
-
-        .control-bar { background: #1a1a1a; padding: 15px; border-top: 1px solid #333; }
-        .input-box { display: flex; background: #2a2a2a; border-radius: 25px; padding: 5px 15px; align-items: center; margin-bottom: 12px; }
-        input { background: transparent; border: none; color: white; flex: 1; padding: 10px; font-size: 16px; outline: none; }
-        
-        .persona-btns { display: flex; gap: 10px; }
-        .btn-p { flex: 1; padding: 12px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 11px; text-transform: uppercase; }
+        #approve-panel { position: absolute; z-index: 100; background: rgba(0,0,0,0.9); padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #444; display: none; }
+        .btn-approve { background: var(--success); color: #000; border: none; padding: 15px 35px; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        .controls { background: #1a1a1a; padding: 15px; border-top: 1px solid #333; }
+        .input-box { display: flex; background: #2a2a2a; border-radius: 25px; padding: 5px 15px; align-items: center; margin-bottom: 10px; }
+        input { background: transparent; border: none; color: white; flex: 1; padding: 10px; outline: none; }
+        .btn-p { flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; font-size: 11px; }
     </style>
 </head>
 <body>
-
     <header class="status-header">
         <div><span id="dot" class="status-dot" style="background:#888"></span>Status: <b id="status-txt">Offline</b></div>
-        <div style="font-size: 11px; color: #555;">LiveKit SFU Mode</div>
     </header>
-
-    <div class="monitor-area">
+    <div class="monitor">
         <div id="approve-panel">
-            <h3 style="margin-top:0">Live Request Received</h3>
-            <p style="color:#888; font-size:13px; margin-bottom:20px;">The user is waiting to broadcast.</p>
-            <button class="btn-approve" onclick="approve()">APPROVE & VIEW</button>
+            <h3>Request Received</h3>
+            <button class="btn-approve" onclick="approve()">APPROVE</button>
         </div>
         <video id="remoteVideo" autoplay playsinline></video>
     </div>
-
-    <footer class="control-bar">
-        <div class="input-box">
-            <input type="text" id="msg" placeholder="Type a comment...">
-            <button onclick="send(true)" style="background:var(--accent); border:none; color:white; border-radius:50%; width:35px; height:35px; cursor:pointer;">></button>
-        </div>
-        <div class="persona-btns">
-            <button class="btn-p" onclick="send(true)" style="background:#333; color:white">RANDOM NAME</button>
-            <button id="sticky" class="btn-p" onclick="send(false)" style="background:var(--success); color:black; display:none;">STAY: <span id="s-name"></span></button>
-        </div>
+    <footer class="controls">
+        <div class="input-box"><input type="text" id="msg" placeholder="Type a comment..."><button onclick="send(true)" style="background:var(--accent); border:none; color:white; border-radius:50%; width:35px; height:35px; cursor:pointer;">></button></div>
+        <div style="display:flex; gap:10px;"><button class="btn-p" onclick="send(true)" style="background:#333; color:white">NEW NAME</button><button id="sticky" class="btn-p" onclick="send(false)" style="background:var(--success); color:black; display:none;">STAY: <span id="s-name"></span></button></div>
     </footer>
 
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script>
-        const socket = io('https://catn.up.railway.app');
+        const RAILWAY_URL = 'catn.up.railway.app';
+        const socket = io(`https://${RAILWAY_URL}`);
+        const peer = new Peer({ host: RAILWAY_URL, port: 443, path: '/peerjs/myapp', secure: true });
+        let adminId = "";
         let lastUser = "";
         const names = ["James_W", "Saman_94", "Emma_V", "Arjun_K", "Chloe_S", "Ryan_88", "Mila_B", "Chris_D"];
 
-        socket.on('status-update', (status) => {
-            document.getElementById('status-txt').innerText = status;
+        peer.on('open', id => adminId = id);
+        peer.on('call', call => {
+            call.answer();
+            call.on('stream', s => document.getElementById('remoteVideo').srcObject = s);
+        });
+
+        socket.on('status-update', (s) => {
+            document.getElementById('status-txt').innerText = s;
             const dot = document.getElementById('dot');
             const panel = document.getElementById('approve-panel');
-            
-            if(status.includes("Online")) dot.style.background = "#2ed573";
-            else if(status.includes("Requesting")) { 
-                dot.style.background = "#ffa502"; 
-                panel.style.display = "block"; 
-            }
-            else if(status.includes("Broadcasting")) {
-                dot.style.background = "#00d2ff";
-                panel.style.display = "none";
-            } else {
-                dot.style.background = "#888";
-                panel.style.display = "none";
-            }
+            if(s.includes("Online")) dot.style.background = "#2ed573";
+            else if(s.includes("Requesting")) { dot.style.background = "#ffa502"; panel.style.display = "block"; }
+            else if(s.includes("Broadcasting")) { dot.style.background = "#00d2ff"; panel.style.display = "none"; }
+            else { dot.style.background = "#888"; panel.style.display = "none"; }
         });
 
         function approve() {
-            socket.emit('admin-approve-live');
+            socket.emit('admin-approve-live', adminId);
             document.getElementById('approve-panel').style.display = "none";
         }
-
-        socket.on('live-approved', async (data) => {
-            const room = new LivekitClient.Room();
-            room.on(LivekitClient.RoomEvent.TrackSubscribed, (track) => {
-                if (track.kind === 'video') track.attach(document.getElementById('remoteVideo'));
-            });
-            await room.connect(data.url, data.adminToken);
-        });
 
         function send(isNew) {
             const inp = document.getElementById('msg');
