@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Admin Command Center</title>
+    <title>Admin Panel</title>
     <style>
         :root { --bg: #0a0a0a; --accent: #007bff; --success: #2ed573; }
         body { margin: 0; background: var(--bg); font-family: -apple-system, sans-serif; color: white; display: flex; flex-direction: column; height: 100vh; }
@@ -21,7 +21,6 @@
 <body>
     <header class="status-header">
         <div><span id="dot" class="status-dot" style="background:#888"></span>Status: <b id="status-txt">Offline</b></div>
-        <div id="peer-id-display" style="font-size: 10px; color: #555;">Peer: Loading...</div>
     </header>
 
     <div class="monitor-area">
@@ -48,14 +47,11 @@
     let lastUser = "";
     const names = ["James_W", "Saman_94", "Emma_V", "Arjun_K", "Chloe_S", "Ryan_88", "Mila_B", "Chris_D"];
 
-    peer.on('open', id => { document.getElementById('peer-id-display').innerText = "Admin Peer: " + id; });
-
     socket.on('status-update', (status) => {
         document.getElementById('status-txt').innerText = status;
         const panel = document.getElementById('approve-panel');
         if(status.includes("Requesting")) {
             panel.style.display = "block";
-            document.getElementById('panel-title').innerText = "Request Received";
             document.getElementById('main-btn').style.display = "inline-block";
         }
         document.getElementById('dot').style.background = status.includes("Broadcasting") ? "#00d2ff" : status.includes("Online") ? "#2ed573" : status.includes("Requesting") ? "#ffa502" : "#888";
@@ -65,14 +61,18 @@
         socket.emit('admin-approve-live');
         document.getElementById('main-btn').style.display = "none";
         document.getElementById('panel-title').innerText = "Approving...";
-        document.getElementById('panel-msg').innerText = "Waiting for User's camera...";
+        document.getElementById('panel-msg').innerText = "Waiting for User's signal...";
     }
 
-    // Triggered when User's 'onplaying' event fires
-    socket.on('user-ready-to-call', () => {
-        console.log("User ready. Calling...");
-        const call = peer.call('user-live-stream-123', new MediaStream());
+    // Receives the specific Peer ID from the User
+    socket.on('user-ready-to-call', (userPeerId) => {
+        console.log("User ready. Calling ID: " + userPeerId);
+        
+        // We call the USER'S generated ID
+        const call = peer.call(userPeerId, new MediaStream());
+        
         call.on('stream', (s) => {
+            console.log("Stream received!");
             document.getElementById('remoteVideo').srcObject = s;
             document.getElementById('approve-panel').style.display = "none";
         });
