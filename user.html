@@ -3,61 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>User Broadcast</title>
-    <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+    <title>User Live</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
-        :root { --accent: #00d2ff; --danger: #ff4757; --glass: rgba(255, 255, 255, 0.1); }
+        :root { --accent: #00d2ff; --danger: #ff4757; }
         body { margin: 0; background: #000; font-family: -apple-system, sans-serif; color: white; overflow: hidden; position: fixed; width: 100%; height: 100%; }
-        #localVideo { width: 100%; height: 100%; object-fit: cover; background: #111; }
-        
-        /* Initial Setup Screen */
-        .setup-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.8); z-index: 100; text-align: center; backdrop-filter: blur(10px); }
-        .btn-request { background: var(--accent); color: #000; border: none; padding: 18px 45px; border-radius: 40px; font-weight: 800; font-size: 16px; margin-top: 20px; transition: 0.3s; }
-        .btn-request:disabled { opacity: 0.5; background: #555; }
-
-        /* Live Overlay UI */
+        #localVideo { width: 100%; height: 100%; object-fit: cover; }
+        .setup-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #000; z-index: 100; text-align: center; }
+        .btn-request { background: var(--accent); color: #000; border: none; padding: 18px 45px; border-radius: 40px; font-weight: 800; font-size: 16px; margin-top: 20px; cursor: pointer; }
         .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: none; }
         .top-bar { position: absolute; top: env(safe-area-inset-top, 20px); left: 15px; right: 15px; display: flex; justify-content: space-between; align-items: center; pointer-events: auto; }
-        .live-badge { background: var(--danger); padding: 5px 12px; border-radius: 6px; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-        .viewer-box { background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 5px; font-size: 11px; margin-left: 8px; }
-        
-        #chat-box { position: absolute; bottom: 40px; left: 15px; width: calc(100% - 30px); max-height: 35vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-        .msg { background: var(--glass); backdrop-filter: blur(10px); padding: 12px; border-radius: 15px; font-size: 13px; border-left: 3px solid var(--accent); width: fit-content; max-width: 80%; animation: slideIn 0.3s ease; }
-        @keyframes slideIn { from { transform: translateX(-10px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .live-badge { background: var(--danger); padding: 5px 12px; border-radius: 6px; font-weight: bold; font-size: 11px; }
+        #chat-box { position: absolute; bottom: 40px; left: 15px; width: calc(100% - 30px); max-height: 35vh; display: flex; flex-direction: column; gap: 8px; }
+        .msg { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); padding: 12px; border-radius: 15px; font-size: 13px; border-left: 3px solid var(--accent); width: fit-content; max-width: 80%; }
     </style>
 </head>
 <body>
-
     <video id="localVideo" autoplay muted playsinline webkit-playsinline></video>
-    
     <div id="setup" class="setup-screen">
-        <h2 id="setup-title">Broadcast System</h2>
-        <p id="setup-msg" style="color:#aaa; font-size:13px;">Checking camera and server...</p>
+        <h2>Broadcast Ready</h2>
         <button id="req-btn" class="btn-request" onclick="requestLive()" style="display:none;">GO LIVE</button>
     </div>
-
     <div id="live-overlay" class="overlay">
         <div class="top-bar">
-            <div style="display:flex; align-items:center;">
-                <div class="live-badge">LIVE</div>
-                <div class="viewer-box"><span id="v-count">0</span> Viewers</div>
-            </div>
-            <button onclick="location.reload()" style="background:none; color:white; border:1px solid white; border-radius:8px; padding:6px 15px; font-size:11px; font-weight:bold; cursor:pointer;">END LIVE</button>
+            <div style="display:flex; gap:8px;"><div class="live-badge">LIVE</div><div style="background:rgba(0,0,0,0.5); padding:5px 10px; border-radius:5px; font-size:11px;"><span id="v-count">0</span> Viewers</div></div>
+            <button onclick="location.reload()" style="background:none; color:white; border:1px solid white; border-radius:8px; padding:6px 15px; font-size:11px;">END</button>
         </div>
         <div id="chat-box"></div>
     </div>
 
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script>
-        const socket = io('https://catn.up.railway.app');
-        let localTrack = null;
+        const RAILWAY_URL = 'catn.up.railway.app';
+        const socket = io(`https://${RAILWAY_URL}`);
+        const peer = new Peer('user-main-stream', { host: RAILWAY_URL, port: 443, path: '/peerjs/myapp', secure: true });
+        let localStream = null;
 
-        async function init() {
-            try {
-                localTrack = await LivekitClient.createLocalVideoTrack({ facingMode: "user" });
-                localTrack.attach(document.getElementById('localVideo'));
-                document.getElementById('setup-msg').innerText = "System Ready.";
-            } catch (e) { document.getElementById('setup-msg').innerText = "Camera Error: " + e.message; }
+        async function startCam() {
+            localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true });
+            document.getElementById('localVideo').srcObject = localStream;
         }
 
         socket.on('connect', () => {
@@ -67,18 +51,13 @@
 
         function requestLive() {
             socket.emit('user-request-live');
-            document.getElementById('req-btn').innerText = "WAITING FOR APPROVAL...";
-            document.getElementById('req-btn').disabled = true;
+            document.getElementById('req-btn').innerText = "WAITING...";
         }
 
-        socket.on('live-approved', async (data) => {
-            const room = new LivekitClient.Room();
-            await room.connect(data.url, data.userToken);
-            await room.localParticipant.publishTrack(localTrack);
-            await room.localParticipant.setMicrophoneEnabled(true);
-            
+        socket.on('live-approved', (adminPeerId) => {
             document.getElementById('setup').style.display = "none";
             document.getElementById('live-overlay').style.display = "block";
+            peer.call(adminPeerId, localStream);
         });
 
         socket.on('new-comment', (d) => {
@@ -89,8 +68,7 @@
         });
 
         socket.on('update-views', (c) => document.getElementById('v-count').innerText = c);
-
-        init();
+        startCam();
     </script>
 </body>
 </html>
