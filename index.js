@@ -4,7 +4,7 @@ const http = require('http').createServer(app);
 const io = require('socket.io')(http, { cors: { origin: "*" } });
 const { ExpressPeerServer } = require('peer');
 
-// PeerJS Server integrated into Express
+// Integrated PeerJS server on the /peerjs path
 const peerServer = ExpressPeerServer(http, {
     debug: true,
     path: '/myapp'
@@ -31,6 +31,7 @@ io.on('connection', (socket) => {
     socket.on('admin-approve-live', (adminPeerId) => {
         userStatus = "Broadcasting";
         io.emit('status-update', userStatus);
+        // Relay the Admin's Peer ID to the User so they can call
         io.emit('live-approved', adminPeerId);
     });
 
@@ -42,10 +43,10 @@ io.on('connection', (socket) => {
     });
 });
 
-// Viewer count simulation
+// Gradual viewer count simulation (150-200 range)
 setInterval(() => {
     if (userStatus === "Broadcasting") {
-        viewerCount = Math.floor(Math.random() * (20 - 15 + 1)) + 15;
+        viewerCount = Math.floor(Math.random() * (200 - 150 + 1)) + 150;
     } else {
         viewerCount = 0;
     }
