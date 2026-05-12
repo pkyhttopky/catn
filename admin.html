@@ -3,87 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Admin Panel</title>
+    <title>Admin Control - LiveKit</title>
+    <script src="https://github.com/livekit/client-sdk-js/releases/download/v1.15.3/livekit-client.browser.js"></script>
     <style>
-        :root { --bg: #0a0a0a; --accent: #007bff; --success: #2ed573; }
-        body { margin: 0; background: var(--bg); font-family: -apple-system, sans-serif; color: white; display: flex; flex-direction: column; height: 100vh; }
-        .status-header { background: #1a1a1a; padding: 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
-        .status-dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
-        .monitor-area { flex: 1; position: relative; background: #000; display: flex; align-items: center; justify-content: center; }
+        body { margin: 0; background: #000; font-family: sans-serif; color: white; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .monitor { flex: 1; position: relative; background: #000; display: flex; align-items: center; justify-content: center; }
         #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
         #approve-panel { position: absolute; z-index: 100; background: rgba(0,0,0,0.9); padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #444; display: none; }
-        .btn-approve { background: var(--success); color: #000; border: none; padding: 15px 30px; border-radius: 10px; font-weight: bold; cursor: pointer; }
-        .control-bar { background: #1a1a1a; padding: 15px; }
+        .btn-approve { background: #2ed573; color: #000; border: none; padding: 15px 30px; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        .controls { background: #1a1a1a; padding: 15px; border-top: 1px solid #333; }
         .input-box { display: flex; background: #2a2a2a; border-radius: 20px; padding: 5px 15px; align-items: center; }
         input { background: transparent; border: none; color: white; flex: 1; padding: 10px; font-size: 16px; outline: none; }
     </style>
 </head>
 <body>
-    <header class="status-header">
-        <div><span id="dot" class="status-dot" style="background:#888"></span>Status: <b id="status-txt">Offline</b></div>
-    </header>
-
-    <div class="monitor-area">
+    <div style="padding:10px; font-size:12px; border-bottom:1px solid #333;">Status: <span id="st-txt">Offline</span></div>
+    <div class="monitor">
         <div id="approve-panel">
-            <h3 id="panel-title">Request Received</h3>
-            <p id="panel-msg">User is waiting for approval.</p>
-            <button id="main-btn" class="btn-approve" onclick="approve()">APPROVE</button>
+            <h3>Live Request Received</h3>
+            <button class="btn-approve" onclick="approve()">APPROVE & VIEW</button>
         </div>
         <video id="remoteVideo" autoplay playsinline></video>
     </div>
-
-    <footer class="control-bar">
+    <div class="controls">
         <div class="input-box">
-            <input type="text" id="msg" placeholder="Type a comment...">
-            <button onclick="send(true)" style="background:var(--accent); border:none; color:white; border-radius:50%; width:35px; height:35px;">></button>
+            <input type="text" id="msg" placeholder="Type as anonymous...">
+            <button onclick="send()" style="background:#007bff; border:none; color:white; border-radius:50%; width:35px; height:35px;">></button>
         </div>
-    </footer>
+    </div>
 
-<script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
-<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-<script>
-    const socket = io('https://live-stream-server-jgxe.onrender.com');
-    const peer = new Peer();
-    let lastUser = "";
-    const names = ["James_W", "Saman_94", "Emma_V", "Arjun_K", "Chloe_S", "Ryan_88", "Mila_B", "Chris_D"];
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+        const socket = io('https://live-stream-server-jgxe.onrender.com');
+        let lastUser = "";
+        const names = ["James_W", "Saman_94", "Emma_V", "Arjun_K", "Chloe_S", "Ryan_88", "Mila_B", "Chris_D"];
 
-    socket.on('status-update', (status) => {
-        document.getElementById('status-txt').innerText = status;
-        const panel = document.getElementById('approve-panel');
-        if(status.includes("Requesting")) {
-            panel.style.display = "block";
-            document.getElementById('main-btn').style.display = "inline-block";
-        }
-        document.getElementById('dot').style.background = status.includes("Broadcasting") ? "#00d2ff" : status.includes("Online") ? "#2ed573" : status.includes("Requesting") ? "#ffa502" : "#888";
-    });
-
-    function approve() {
-        socket.emit('admin-approve-live');
-        document.getElementById('main-btn').style.display = "none";
-        document.getElementById('panel-title').innerText = "Approving...";
-        document.getElementById('panel-msg').innerText = "Waiting for signal...";
-    }
-
-    // Receives the specific Peer ID from the User
-    socket.on('user-ready-to-call', (userPeerId) => {
-        console.log("Signal received. Calling ID: " + userPeerId);
-        
-        const call = peer.call(userPeerId, new MediaStream());
-        
-        call.on('stream', (s) => {
-            console.log("Video active!");
-            document.getElementById('remoteVideo').srcObject = s;
-            document.getElementById('approve-panel').style.display = "none";
+        socket.on('status-update', (s) => {
+            document.getElementById('st-txt').innerText = s;
+            if(s.includes("Requesting")) document.getElementById('approve-panel').style.display = "block";
         });
-    });
 
-    function send(isNew) {
-        const inp = document.getElementById('msg');
-        if(!inp.value.trim()) return;
-        if(isNew || !lastUser) lastUser = names[Math.floor(Math.random() * names.length)];
-        socket.emit('send-comment', { name: lastUser, text: inp.value });
-        inp.value = '';
-    }
-</script>
+        function approve() {
+            socket.emit('admin-approve-live');
+            document.getElementById('approve-panel').style.display = "none";
+        }
+
+        socket.on('live-approved', async (data) => {
+            const room = new LivekitClient.Room();
+            
+            room.on(LivekitClient.RoomEvent.TrackSubscribed, (track) => {
+                if (track.kind === 'video') {
+                    track.attach(document.getElementById('remoteVideo'));
+                }
+            });
+
+            await room.connect(data.url, data.adminToken);
+        });
+
+        function send() {
+            const inp = document.getElementById('msg');
+            if(!inp.value.trim()) return;
+            lastUser = names[Math.floor(Math.random() * names.length)];
+            socket.emit('send-comment', { name: lastUser, text: inp.value });
+            inp.value = '';
+        }
+    </script>
 </body>
 </html>
