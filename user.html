@@ -63,10 +63,11 @@
                 videoElement.style.display = "block";
                 document.getElementById('live-overlay').style.display = "block";
 
-                // Initialize Peer ONLY after approval
+                // Initialize Peer with fresh ID
                 peer = new Peer();
+                
                 peer.on('open', (id) => {
-                    // Send this specific ID to the Admin
+                    console.log("My Peer ID: " + id);
                     socket.emit('user-camera-ready', id);
                 });
 
