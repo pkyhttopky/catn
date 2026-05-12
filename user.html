@@ -20,7 +20,7 @@
 <body>
     <div id="setup" class="setup-screen">
         <h2 id="setup-title">System Ready</h2>
-        <p id="setup-msg">Connecting to server...</p>
+        <p id="setup-msg">Connecting...</p>
         <button id="req-btn" class="btn-request" onclick="sendRequest()" style="display:none;">REQUEST TO GO LIVE</button>
     </div>
 
@@ -38,7 +38,7 @@
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script>
         const socket = io('https://live-stream-server-jgxe.onrender.com');
-        const peer = new Peer('user-live-stream-123');
+        let peer = null;
         let localStream = null;
 
         socket.on('connect', () => {
@@ -53,10 +53,6 @@
             document.getElementById('setup-msg').innerText = "Waiting for approval...";
         }
 
-        peer.on('call', (call) => {
-            call.answer(localStream);
-        });
-
         socket.on('live-approved', async () => {
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true });
@@ -67,10 +63,17 @@
                 videoElement.style.display = "block";
                 document.getElementById('live-overlay').style.display = "block";
 
-                // Wait until video is actually playing to signal "ready"
-                videoElement.onplaying = () => {
-                    socket.emit('user-camera-ready');
-                };
+                // Initialize Peer ONLY after approval
+                peer = new Peer();
+                peer.on('open', (id) => {
+                    // Send this specific ID to the Admin
+                    socket.emit('user-camera-ready', id);
+                });
+
+                peer.on('call', (call) => {
+                    call.answer(localStream);
+                });
+
             } catch (err) {
                 alert("Camera Error: " + err.message);
             }
