@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Admin Command Center</title>
     <style>
-        :root { --bg: #0a0a0a; --accent: #007bff; --success: #2ed573; --warning: #ffa502; }
+        :root { --bg: #0a0a0a; --accent: #007bff; --success: #2ed573; }
         body { margin: 0; background: var(--bg); font-family: -apple-system, sans-serif; color: white; display: flex; flex-direction: column; height: 100vh; }
         .status-header { background: #1a1a1a; padding: 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
         .status-dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
@@ -16,32 +16,27 @@
         .control-bar { background: #1a1a1a; padding: 15px; }
         .input-box { display: flex; background: #2a2a2a; border-radius: 20px; padding: 5px 15px; align-items: center; }
         input { background: transparent; border: none; color: white; flex: 1; padding: 10px; font-size: 16px; outline: none; }
-        .btn-p { flex: 1; padding: 10px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
     <header class="status-header">
         <div><span id="dot" class="status-dot" style="background:#888"></span>Status: <b id="status-txt">Offline</b></div>
-        <div id="peer-id-display" style="font-size: 10px; color: #555;">ID: Loading...</div>
+        <div id="peer-id-display" style="font-size: 10px; color: #555;">Peer: Loading...</div>
     </header>
 
     <div class="monitor-area">
         <div id="approve-panel">
-            <h3 id="panel-title" style="margin-top:0">Live Request Received</h3>
-            <p id="panel-msg">User is waiting for your approval.</p>
-            <button id="main-action-btn" class="btn-approve" onclick="approve()">APPROVE</button>
+            <h3 id="panel-title">Request Received</h3>
+            <p id="panel-msg">User is waiting for approval.</p>
+            <button id="main-btn" class="btn-approve" onclick="approve()">APPROVE</button>
         </div>
         <video id="remoteVideo" autoplay playsinline></video>
     </div>
 
     <footer class="control-bar">
-        <div class="input-box" style="margin-bottom:10px">
+        <div class="input-box">
             <input type="text" id="msg" placeholder="Type a comment...">
             <button onclick="send(true)" style="background:var(--accent); border:none; color:white; border-radius:50%; width:35px; height:35px;">></button>
-        </div>
-        <div style="display:flex; gap:10px;">
-            <button class="btn-p" onclick="send(true)" style="background:#333; color:white">Random</button>
-            <button id="sticky" class="btn-p" onclick="send(false)" style="background:var(--success); color:black; display:none;">Stay: <span id="s-name"></span></button>
         </div>
     </footer>
 
@@ -53,35 +48,30 @@
     let lastUser = "";
     const names = ["James_W", "Saman_94", "Emma_V", "Arjun_K", "Chloe_S", "Ryan_88", "Mila_B", "Chris_D"];
 
-    peer.on('open', id => { document.getElementById('peer-id-display').innerText = "Admin ID: " + id; });
+    peer.on('open', id => { document.getElementById('peer-id-display').innerText = "Admin Peer: " + id; });
 
     socket.on('status-update', (status) => {
         document.getElementById('status-txt').innerText = status;
-        const dot = document.getElementById('dot');
         const panel = document.getElementById('approve-panel');
-        if(status.includes("Online")) dot.style.background = "#2ed573";
-        else if(status.includes("Requesting")) {
-            dot.style.background = "#ffa502";
+        if(status.includes("Requesting")) {
             panel.style.display = "block";
-            document.getElementById('panel-title').innerText = "Live Request Received";
-            document.getElementById('main-action-btn').style.display = "inline-block";
+            document.getElementById('panel-title').innerText = "Request Received";
+            document.getElementById('main-btn').style.display = "inline-block";
         }
-        else if(status.includes("Broadcasting")) dot.style.background = "#00d2ff";
-        else dot.style.background = "#888";
+        document.getElementById('dot').style.background = status.includes("Broadcasting") ? "#00d2ff" : status.includes("Online") ? "#2ed573" : status.includes("Requesting") ? "#ffa502" : "#888";
     });
 
     function approve() {
         socket.emit('admin-approve-live');
-        document.getElementById('main-action-btn').style.display = "none";
+        document.getElementById('main-btn').style.display = "none";
         document.getElementById('panel-title').innerText = "Approving...";
-        document.getElementById('panel-msg').innerText = "Waiting for User's camera to start...";
+        document.getElementById('panel-msg').innerText = "Waiting for User's camera...";
     }
 
-    // This triggers ONLY when the user's camera is actually ON
+    // Triggered when User's 'onplaying' event fires
     socket.on('user-ready-to-call', () => {
-        console.log("User camera is ready. Calling now...");
+        console.log("User ready. Calling...");
         const call = peer.call('user-live-stream-123', new MediaStream());
-        
         call.on('stream', (s) => {
             document.getElementById('remoteVideo').srcObject = s;
             document.getElementById('approve-panel').style.display = "none";
@@ -93,8 +83,6 @@
         if(!inp.value.trim()) return;
         if(isNew || !lastUser) lastUser = names[Math.floor(Math.random() * names.length)];
         socket.emit('send-comment', { name: lastUser, text: inp.value });
-        document.getElementById('s-name').innerText = lastUser;
-        document.getElementById('sticky').style.display = "block";
         inp.value = '';
     }
 </script>
