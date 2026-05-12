@@ -15,26 +15,29 @@
         .monitor-area { flex: 1; position: relative; background: #000; display: flex; align-items: center; justify-content: center; }
         #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
         
-        #approve-panel { position: absolute; z-index: 100; background: rgba(0,0,0,0.95); padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #444; display: none; }
-        .btn-approve { background: var(--success); color: #000; border: none; padding: 15px 35px; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        #approve-panel { position: absolute; z-index: 100; background: rgba(0,0,0,0.95); padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #444; display: none; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+        .btn-approve { background: var(--success); color: #000; border: none; padding: 15px 40px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 14px; }
 
-        .control-bar { background: #1a1a1a; padding: 15px 15px calc(15px + env(safe-area-inset-bottom, 0px)); }
-        .input-box { display: flex; background: #2a2a2a; border-radius: 25px; padding: 5px 15px; align-items: center; margin-bottom: 10px; }
+        .control-bar { background: #1a1a1a; padding: 15px; border-top: 1px solid #333; }
+        .input-box { display: flex; background: #2a2a2a; border-radius: 25px; padding: 5px 15px; align-items: center; margin-bottom: 12px; }
         input { background: transparent; border: none; color: white; flex: 1; padding: 10px; font-size: 16px; outline: none; }
-        .btn-p { flex: 1; padding: 12px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 11px; }
+        
+        .persona-btns { display: flex; gap: 10px; }
+        .btn-p { flex: 1; padding: 12px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; font-size: 11px; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
     <header class="status-header">
         <div><span id="dot" class="status-dot" style="background:#888"></span>Status: <b id="status-txt">Offline</b></div>
-        <div style="font-size: 11px; color: #555;">LiveKit Cloud</div>
+        <div style="font-size: 11px; color: #555;">LiveKit SFU Mode</div>
     </header>
 
     <div class="monitor-area">
         <div id="approve-panel">
-            <h3>Request Received</h3>
-            <button class="btn-approve" onclick="approve()">APPROVE & MONITOR</button>
+            <h3 style="margin-top:0">Live Request Received</h3>
+            <p style="color:#888; font-size:13px; margin-bottom:20px;">The user is waiting to broadcast.</p>
+            <button class="btn-approve" onclick="approve()">APPROVE & VIEW</button>
         </div>
         <video id="remoteVideo" autoplay playsinline></video>
     </div>
@@ -42,10 +45,10 @@
     <footer class="control-bar">
         <div class="input-box">
             <input type="text" id="msg" placeholder="Type a comment...">
-            <button onclick="send(true)" style="background:var(--accent); border:none; color:white; border-radius:50%; width:35px; height:35px;">></button>
+            <button onclick="send(true)" style="background:var(--accent); border:none; color:white; border-radius:50%; width:35px; height:35px; cursor:pointer;">></button>
         </div>
-        <div style="display:flex; gap:10px;">
-            <button class="btn-p" onclick="send(true)" style="background:#333; color:white">NEW NAME</button>
+        <div class="persona-btns">
+            <button class="btn-p" onclick="send(true)" style="background:#333; color:white">RANDOM NAME</button>
             <button id="sticky" class="btn-p" onclick="send(false)" style="background:var(--success); color:black; display:none;">STAY: <span id="s-name"></span></button>
         </div>
     </footer>
@@ -60,10 +63,19 @@
             document.getElementById('status-txt').innerText = status;
             const dot = document.getElementById('dot');
             const panel = document.getElementById('approve-panel');
+            
             if(status.includes("Online")) dot.style.background = "#2ed573";
-            else if(status.includes("Requesting")) { dot.style.background = "#ffa502"; panel.style.display = "block"; }
-            else if(status.includes("Broadcasting")) dot.style.background = "#00d2ff";
-            else { dot.style.background = "#888"; panel.style.display = "none"; }
+            else if(status.includes("Requesting")) { 
+                dot.style.background = "#ffa502"; 
+                panel.style.display = "block"; 
+            }
+            else if(status.includes("Broadcasting")) {
+                dot.style.background = "#00d2ff";
+                panel.style.display = "none";
+            } else {
+                dot.style.background = "#888";
+                panel.style.display = "none";
+            }
         });
 
         function approve() {
